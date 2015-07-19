@@ -1,0 +1,25 @@
+:icons: font
+== Appendix: Lombok
+
+The code in this project uses https://projectlombok.org[Project Lombok]. The project contains
+a series of Java annotations that generate code. Lombok is included as a dependency in the POM:
+
+```
+<dependency>
+	<groupId>org.projectlombok</groupId>
+	<artifactId>lombok</artifactId>
+	<version>${lombok}</version>
+	<scope>provided</scope>
+</dependency>
+```
+
+=== IDE integration
+
+You can find instructions on how to integrate Lombok with your IDE https://projectlombok.org/features/[here]. But the gist is 
+that the lombok jar is executable and will help install lombok for you (at least on eclipse distributions):
+
+```
+java -jar lombok-${lombok}.jar
+```
+
+This allows for the auto-generation of class methods which will make you IDE happy.

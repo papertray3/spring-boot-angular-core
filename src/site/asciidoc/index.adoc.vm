@@ -1,0 +1,117 @@
+:icons: font
+:sectanchors:
+${description}
+
+== Background
+This project is a starting point that incorporates several capabilities and components to be used as a starting point for a `typical` type of web application. This application provides a simple JPA enabled RESTful web service provided by the spring framework and a browserified angular front end. 
+
+This application is a simple, multi-user application that allows users to store contact information for people. The app provides security (via JDBC) and a means to register a new account.
+
+== Development Environment
+The IDE used to develop the project was the https://spring.io/tools[Spring Tool Suite]. 
+
+.Spring Tool Suite
+
+image::images/sts.png[]
+
+
+The following versions of tools were used to develop this project:
+
+.git
+```
+$ git --version
+git version 1.9.1
+```
+
+.JAVA
+```
+$ java -version
+java version "1.8.0_45"
+Java(TM) SE Runtime Environment (build 1.8.0_45-b14)
+Java HotSpot(TM) 64-Bit Server VM (build 25.45-b02, mixed mode)
+```
+
+TIP: There are no JAVA 1.8 specific features used in this project (e.g. lambda expressions) so JAVA 1.7 could be used. 
+Simply change the JAVA version in the Maven POM.
+
+.Maven
+```
+$ mvn --version
+Apache Maven 3.0.5
+Maven home: /usr/share/maven
+Java version: 1.8.0_45, vendor: Oracle Corporation
+Java home: /usr/lib/jvm/java-8-oracle/jre
+Default locale: en_US, platform encoding: UTF-8
+OS name: "linux", version: "3.13.0-32-generic", arch: "amd64", family: "unix"
+```
+
+
+== Project Initialization
+
+Project was initially created with https://spring.starter.io[Spring Boot Initializr]
+
+```
+mkdir contacts
+cd contacts
+curl https://start.spring.io/starter.tgz -d name=contacts \
+-d description="Fully executable spring-boot application with angular integration as a starting point" \
+-d javaVersion=1.8 -d groupId=com.bct -d artifactId=contacts \
+-d packageName=com.bct -d packaging=war \
+-d dependencies=security,data-jpa,data-rest,h2,mysql | tar -zxf -
+```
+
+== Launching the Application
+At this point, you can "deploy" the application and try it out with the command:
+
+	mvn spring-boot:run -Dserver.port=8081
+	
+NOTE: This will start a tomcat instance on your localhost at port 8081. This guide 
+assumes that your running the application on port 8081. However, you can change the 
+port number accordingly.  Later, the port number will be set in the application.properties 
+file.
+
+Pointing your browser to http://localhost:8081 will then prompt you for a user
+name and password. The default user name is `user`. The output of the above maven 
+command will generate a lot of
+output. You should see a default password given by spring in the output:
+
+	Using default security password: 9e8c4a37-8ce6-4ebb-a701-227a84135072
+	
+The password will change each time you start the application. In a bit we will 
+set it to something consistent and easier to type. Enter the password and the 
+result should provide a HATEOAS REST response:
+
+```
+{
+  "_links" : {
+    "profile" : {
+      "href" : "http://localhost:8081/alps"
+    }
+  }
+}
+```
+
+.Spring Boot Applications
+****
+On startup, the `spring-boot-maven-plugin` looks for a class annotated with the 
+`@SpringBootApplication` annotation and has a static main method (in this case
+`com.bct.ContactsApplication`). The `@SpringBootApplication`
+annotation performs several types of auto-configuration which you can override
+as you need. When deploying to a servlet container (servlet spec 3.0 or later), 
+the container will find the `com.bct.ServletInitilizer` class and start the application 
+via this class rather than the `com.bct.ContactsApplication` class (all the same
+auto-configuration will take place). Since all 
+the servlet configuration can be done in java, there is no longer a need for a 
+web.xml file. However, I have found that you cannot set you application to be
+`distributable` via a java config, so you can include a web.xml file that simply 
+contains the `<distributable/>` tag.
+
+One thing to be careful of, is that the component scan that looks
+for controllers, hibernate entities, Spring configurations and the like, expect
+those classes to be relative to that java package that holds the main application
+class. In other words, all spring components need to be in a java package that is
+under the `com.bct` package. Otherwise, you will have to override the Spring 
+configuration to look in other packages.
+****
+
+*SUCCESS!* Now to move on to link:0.html[Project Setup]

@@ -20,7 +20,10 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<java.version>1.8</java.version>
+		<lombok.version>1.16.4</lombok.version>
+		<tomcat.port>8081</tomcat.port>
 	</properties>
 
 	<dependencies>
@@ -69,8 +72,34 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<artifactId>maven-site-plugin</artifactId>
+				<dependencies>
+					<dependency>
+						<groupId>org.asciidoctor</groupId>
+						<artifactId>asciidoctor-maven-plugin</artifactId>
+						<version>1.5.2.1</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<port>9001</port>
+					<attributes>
+						<description>${project.description}</description>
+						<lombok>${lombok.version}</lombok>
+						<parentVersion>${project.parent.version}</parentVersion>
+						<localHost>http://localhost:${tomcat.port}/</localHost>
+					</attributes>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
+
+	<distributionManagement>
+		<site>
+			<id>site-info</id>
+			<url>file://${project.basedir}/site</url>
+		</site>
+	</distributionManagement>
 	
 
 </project>

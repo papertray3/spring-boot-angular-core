@@ -1,0 +1,246 @@
+:icons: font
+:sectanchors:
+== REST Service
+
+In this section we will be adding the necessary classes to build a REST
+service that will respond using https://en.wikipedia.org/wiki/HATEOAS[HATEOAS] 
+constraint. Why HATEOAS? Because that what you get out of the box. For this
+application, we will be managing a series of personal contacts and each contact
+can have 0 or more phone numbers. You can easily extend the concept to hold other
+pieces of information like addresses and such, but for now, this will get the 
+point across. 
+
+=== Hibernate Entities
+
+We will start by laying out some core concepts. We can make a good guess that
+all our entities will have a simple one-up counter for an ID, and to help with
+DB locking each entity will have a `@Version` field. Together, we can abstract 
+those things out into a `@MappedSuperclass`, `com.bct.data.AbstractEntity`
+
+.Abstract Entity
+```[source,java]
+@MappedSuperclass
+@Getter
+@ToString
+@EqualsAndHashCode
+public abstract class AbstractEntity implements Identifiable<Long> {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO)
+	private final Long id;
+	
+	@Version
+	private Long version;
+	
+	public AbstractEntity() {
+		this.id = null;
+	}
+	
+}
+```
+
+Besides the `@MappedSuperclass` annotation, the other class level annotations are 
+all Lombok annotations that provide functionality for us (you can probably guess
+what they do from the name). Otherwise, there is a primary key (the `@Id` annotation)
+which is a one-up counter (the `@GeneratedValue` annotation). And the version 
+filed is used for optimistic DB locking. Now, on to the actual entities.
+
+Since we will have multiple users, we need a User entity. Each user will have 
+their own contacts that they can manage. There are several ways to hold and 
+manage user accounts for this example, we'll use the old-fashioned method of 
+storing them in a database. We've separated out the security based attributes that users should not have
+access to from the account based attributes that users should. The idea is to 
+never pass around the user information from the server. You can add whatever
+type of profile information you want to the user profile but for now, it is 
+very simple (just first and last name). The Role entity is also very simple, for
+now there is just the name of the role (for this application just `ROLE_USER` 
+and `ROLE_ADMIN`).
+
+.User Entity
+```[source,java]
+@Entity
+@Getter
+@Setter
+@ToString
+public class User extends AbstractEntity {
+
+	private String email;
+	private String password;
+	private boolean enabled;
+	private Date created;
+	private Date lastLogin;
+	private Date currentLogin;
+	
+	@ManyToMany(fetch = FetchType.EAGER)
+	List<UserRole> roles;
+	
+	public User() {
+		super();
+		created = new Date();
+		lastLogin = null;
+		currentLogin = null;
+		enabled = false;
+	}
+	
+	@OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+	private UserProfile profile;
+}
+```
+
+The contact entity will have the first and last name of a contact, a list of 
+phone numbers and belong to a user.  
+
+WARNING: We only store the ID of the user in the Contact Entity (we are NOT using
+a `@ManyToOne` relationship) as a security measure of not passing around the User
+Entity.
+
+.Contact Entity
+```[source,java]
+@Entity
+@NoArgsConstructor
+@Getter
+@Setter
+public class Contact extends AbstractEntity {
+
+	private String firstName;
+	private String lastName;
+	
+	@OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+	List<PhoneNumber> numbers;
+	
+	private Long userId;
+	
+	public Contact(String firstName, String lastName, Long userId) {
+		super();
+		this.firstName = firstName;
+		this.lastName = lastName;
+		this.userId = userId;
+	}
+}
+```
+
+
+.Phone Number Entity
+```[source,java]
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+public class PhoneNumber extends AbstractEntity {
+
+	private String type;
+	private String number;
+	
+	public PhoneNumber(String type, String number) {
+		super();
+		this.type = type;
+		this.number = number;
+	}
+}
+```
+
+=== REST API
+
+Now we can take advantage of Spring's data repositories. We can expose the repository
+as a REST resource and add custom functionality without writing any java logic.
+In this case we simply have to define a new interface, `com.bct.data.repo.ContactsRepository`.
+
+.Contacts REST Repository
+```[sourc,java]
+@RepositoryRestResource
+public interface ContactsRepository extends CrudRepository<Contact, Long> {
+	@RestResource(rel = "firstname", path = "firstname")
+	List<Contact> findByFirstName(@Param("name") String name);
+	
+	@RestResource(rel = "lastname", path = "lastname")
+	List<Contact> findByLastName(@Param("name") String name);
+}
+```
+
+This small amount of code provides us with full CRUD functionality for our `Contacts`
+class. And we have added two custom functions which will find people by first 
+and last names. We do not have to write the code for these functions Spring will 
+figure it out based on the function name (see http://docs.spring.io/spring-data/jpa/docs/current/reference/html/#jpa.query-methods[this section on query methods]
+for more information). There are several other ways to provide custom functionality
+which are documented at http://docs.spring.io/spring-data/jpa/docs/current/reference/html/.
+
+Here the `@RepositoryRestResource` annotation exposes this repository as a REST
+endpoint. And while the `@RestResource` annotation is not absolutely necessary,
+it allows us a means to adjust how the data is represented in the output. Just know 
+that the `rel` attribute adjusts the JSON tag in the output while the `path` 
+attribute adjusts the URI in the output. If you re-launch the application and 
+go to ${localHost} you'll notice some new output. 
+
+```
+{
+  "_links" : {
+    "contacts" : {
+      "href" : "${localHost}/contacts"
+    },
+    "profile" : {
+      "href" : "${localHost}/alps"
+    }
+  }
+}
+```
+
+
+Plus you can find the custom functions we added at ${localHost}contacts/search.
+
+```
+{
+  "_links" : {
+    "firstname" : {
+      "href" : "${localHost}/contacts/search/firstname{?name}",
+      "templated" : true
+    },
+    "lastname" : {
+      "href" : "${localHost}/contacts/search/lastname{?name}",
+      "templated" : true
+    }
+  }
+}
+```
+
+NOTE: Because we used the `@RestResource` annotation on our findBy functions the
+JSON tags are `firstname` and `lastname` instead of `findByFirstname` and 
+`findByLastname`; this was due to the `rel` attribute.  Similarly, the URIs have 
+the appropriate names due to the `path` attribute.
+
+=== Sample Data 
+
+Now that we have our REST API, we need to have some data in it so that we can 
+see what it does. For simple spot tests, it may be easy to just enter the data 
+via the H2 web interface. But we can also load data automatically by placing a 
+`data.sql` file in src/main/resources. There can also be a `schema.sql` file as
+well to create the schema. But for our purposes, the test data is all we need.
+To keep the data from being loaded in the production build, simply add 
+`spring.datasource.initialize=false` to the `application.properties` file. 
+However, you will then have to add `spring.datasource.initialize=true` to the 
+application-dev.properties. The other way to solve this is to exclude this file
+in the `prod` profile of the POM:
+
+```
+		<profile>
+			<id>prod</id>
+			<activation>
+				<property>
+					<name>build.env</name>
+					<value>prod</value>
+				</property>
+			</activation>
+			<properties>
+				<h2.scope>provided</h2.scope>
+			</properties>
+			<build>
+				<resources>
+					<resource>
+						<directory>src/main/resources</directory>
+						<excludes>
+							<exclude>data.sql</exclude>
+						</excludes>
+					</resource>
+				</resources>
+			</build>
+		</profile>
+```

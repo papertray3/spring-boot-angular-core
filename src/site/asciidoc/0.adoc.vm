@@ -1,0 +1,232 @@
+:icons: font
+:sectanchors:
+
+== Project Setup
+Before beginning the development of the project, there are several things that 
+need to be addressed in the maven POM (pom.xml). Looking at the POM, you will notice
+that it is derived from the `org.springframework.boot:spring-boot-starter-parent:${parentVersion}`;
+this will provide stability in the build by providing version numbers for several 
+maven dependencies. Therefore, in many cases it is not necessary to indicate versions
+for new dependencies that are within the Spring purview. Also, when adding new
+spring feature, most likely you can simply add a spring-boot-starter BOM (Bill of Materials) to get
+the appropriate dependencies (see
+http://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#using-boot-starter-poms
+for a list of BOMs)
+
+=== POM Properties
+
+During creation, http://start.spring.io[Spring Initializr] added the `project.build.sourceEncoding`
+property for us and set it to `UTF-8`; this will keep several maven plugins from
+complaining that our build is platform dependent. However, some of the
+reporting plugins will complain of something similar without the
+`project.reporting.outputEncoding` set to `UTF-8`. So that property has been
+added to the POM in the properties section. 
+
+Also, we will eventually want a means to separate between a development build
+and a production build, so let's add a `build.env` property and set it to `dev`
+for our development build. I like to have the development build as the default
+then you can override this property on the command line, e.g. `mvn install
+-Dbuild.env=prod`. Further, we will add a property to hold the port number for
+the Tomcat instance we want. That way you can simply change that value in the POM
+and keep the documentation up-to-date as well. 
+
+NOTE: Normally there is also a test build and you may have need to have other
+types of builds as well.  The project is set up with two builds in mind, `dev` and `prod` and you
+can simply extend the concept.
+
+
+```
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<java.version>1.8</java.version>
+		<build.env>dev</build.env>
+		<tomcat.port>8081</tomcat.port>
+	</properties>
+```
+
+=== Spring Properties
+
+You will notice in the `src/main/resources` directory there is the `application.properties` file. 
+This file will allow you to configure various different aspects of spring, from 
+JDBC connection information to HTTP compression. Spring provides several different
+ways to configure things, using this file is one of the simplest. Spring also allows
+you to separate properties based on spring profiles; for instance, if you need a 
+different set of JDBC credentials for the production build versus the development
+build, you can provide two separate files with the proper properties. The names of 
+those files follow the pattern of `application-<profile name>.properties. At this 
+point we will set up the tomcat server to run on port 8081 by default, 
+so we do not have to provide it on the command line. Also, it would be nice to
+have a friendlier password for the default user.
+
+In the previous section we created a means to manage different builds, where `dev`
+is the default build. So we want to store any development type settings in 
+`application-dev.properties`. Create this file in `src/main/resources` and add 
+the following lines:
+
+	server.port=${tomcat.port}
+	security.user.password=password
+	
+NOTE: If you are using Spring Tool Suite (STS) as your IDE, there is a Spring Properties
+Editor available which will provide auto-complete for the common spring properties
+when editing the `application.properties` file.
+When you create the `application-dev.properties` file, STS will use the default 
+properties editor instead of the Spring Properties Editor (no auto-complete...boo). If you right mouse click
+the properties file you can click on the `Enable Spring Properties Editor` and viola!
+
+At this point, spring will still ignore this file until we enable the profile. While
+there are several ways to do this, the easiest is to set the `spring.profiles.active`
+property to `dev` in the `application.properties` file. However, we want this to be
+dynamic, so instead of `dev` we can use the maven property we set above `build.env`.
+So, your `application.properties` file should contain:
+
+	spring.profiles.active=${build.env}
+	
+The `spring-boot-starter-parent` POM configures maven to filter both `application.properties`
+and `application.yml` if they are stored in `src/main/resources`. We will have to
+adjust that to filter any profile based property files. Once filtering is set up,
+maven will automatically filter the file and place `dev` as the value. The 
+`spring.profiles.active` property can contain other profiles you want active. Simply
+separate them by a comma. Unfortunately, when spring-boot _deploys_, it will 
+not look at the filtered resources unless we configure the spring boot plugin properly.
+Setting the `addResources` configuration value to false in the POM will do the trick:
+
+```
+	<build>
+		<resources>
+			<resource>
+				<directory>${basedir}/src/main/resources</directory>
+				<filtering>true</filtering>
+				<includes>
+					<include>**/application*.properties</include>
+					<include>**/application*.yml</include>
+				</includes>
+			</resource>
+			<resource>
+				<directory>${basedir}/src/main/resources</directory>
+				<excludes>
+					<exclude>**/application.yml</exclude>
+					<exclude>**/application.properties</exclude>
+				</excludes>
+			</resource>
+		</resources>
+	
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<addResources>false</addResources>
+				</configuration>
+			</plugin>
+			.
+			.
+		</plugins>
+	</build>
+```
+
+A simple `mvn clean spring-boot:run` will do the trick and you can access
+${localHost} with user name of '*user*' and a password of '*password*'.
+
+=== Database Access
+
+If you look closely at the maven output when starting the application. You will 
+notice several messages from Hibernate:
+
+```
+2015-07-16 17:43:01.329  INFO 26450 --- [ost-startStop-1] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...]
+2015-07-16 17:43:01.459  INFO 26450 --- [ost-startStop-1] org.hibernate.Version                    : HHH000412: Hibernate Core {4.3.10.Final}
+2015-07-16 17:43:01.462  INFO 26450 --- [ost-startStop-1] org.hibernate.cfg.Environment            : HHH000206: hibernate.properties not found
+2015-07-16 17:43:01.465  INFO 26450 --- [ost-startStop-1] org.hibernate.cfg.Environment            : HHH000021: Bytecode provider name : javassist
+2015-07-16 17:43:01.776  INFO 26450 --- [ost-startStop-1] o.hibernate.annotations.common.Version   : HCANN000001: Hibernate Commons Annotations {4.0.5.Final}
+2015-07-16 17:43:01.951  INFO 26450 --- [ost-startStop-1] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.H2Dialect
+2015-07-16 17:43:02.093  INFO 26450 --- [ost-startStop-1] o.h.h.i.ast.ASTQueryTranslatorFactory    : HHH000397: Using ASTQueryTranslatorFactory
+2015-07-16 17:43:02.320  INFO 26450 --- [ost-startStop-1] org.hibernate.tool.hbm2ddl.SchemaExport  : HHH000227: Running hbm2ddl schema export
+2015-07-16 17:43:02.324  INFO 26450 --- [ost-startStop-1] org.hibernate.tool.hbm2ddl.SchemaExport  : HHH000230: Schema export complete
+```
+
+Since we included H2 as a dependency, Spring is starting an in-memory database for us.
+When we stop the application, the database shuts down, and any data in it is gone.
+But currently, we have no access to the database to see what is in it. Let's fix that.
+H2 comes with a web sever for accessing your data, but since our database is 
+in-memory, the server needs to be started in the same JVM as our application. And 
+we only want the server to start for our development build.
+We will be using the Spring profiles that we just set up in the previous section
+to have Spring start the server for us. To keep things tidy, we'll create a new class
+`com.bct.DevConfiguration.java`:
+
+
+[source,java]
+----
+@Slf4j
+@Configuration
+@Profile("dev")
+public class DevConfiguration {
+
+	@Value("${h2.webPort}")
+	private String webPort;
+	
+	@Bean
+	public Server createH2WebServer() {
+		log.info("Starting H2 web server on port " + webPort);
+		try {
+			return Server.createWebServer("-web", "-webAllowOthers", "-webPort", 
+				webPort).start();
+		} catch (SQLException e) {
+			log.warn("Failed to start H2 web server", e);
+		}
+		
+		return null;
+	}
+}
+----
+
+And place `h2.webPort=8082` in the `application-dev.properties` file. The annotations
+on the class provide the magic:
+
+* `@Slf4j`: a Lombok annotation that creates a log static variable for us
+* `@Configuration`: Spring will look for classes with this annotation as part of
+the application's configuration
+* `@Profile`: Ensures that the class is only used if the given profile is active
+* `@Bean`: Tells spring this is a resource it needs to instantiate and manage; 
+it can be `@Autowired`
+
+Starting the application at this point will fail during compilation since the java
+compiler cannot find the H2 `org.h2.tools.Server` class. This is due to the fact
+that the H2 dependency is marked as `runtime` in the POM. Normally, this is appropriate
+since none of the H2 classes are not referred directly in the code, but rather 
+the classes needed (like the H2 JDBC driver) are loaded dynamically by name.
+So to fix this, we will add a new property to the POM properties section, 
+`h2.scope` and set it to `compile`. This will include it in the packaged WAR. 
+However, the production version of the project will be using MySQL instead of H2
+and having the H2 jar hanging around isn't ideal. So, we can add a profile for the 
+production build that changes the scope to `provided` like so (it cannot be `runtime`
+since the java compiler will still complain):
+
+```
+	<profiles>
+		<profile>
+			<id>prod</id>
+			<activation>
+				<property>
+					<name>build.env</name>
+					<value>prod</value>
+				</property>
+			</activation>
+			<properties>
+				<h2.scope>provided</h2.scope>
+			</properties>
+		</profile>
+	</profiles>
+```
+
+Then we can change the scope for the H2 dependency to `${h2.scope}`.
+
+Re-launching the application now (`mvn spring-boot:run`) provides us a means to look into the database 
+directly. Point your browser at http://localhost:8082; the JDBC URL is 
+`jdbc:h2:mem:testdb`.
+
+.H2 Web Console Login
+image::images/h2access.png[]
