@@ -54,7 +54,7 @@ ways to configure things, using this file is one of the simplest. Spring also al
 you to separate properties based on spring profiles; for instance, if you need a 
 different set of JDBC credentials for the production build versus the development
 build, you can provide two separate files with the proper properties. The names of 
-those files follow the pattern of `application-<profile name>.properties. At this 
+those files follow the pattern of `application-<profile name>.properties`. At this 
 point we will set up the tomcat server to run on port 8081 by default, 
 so we do not have to provide it on the command line. Also, it would be nice to
 have a friendlier password for the default user.
@@ -86,10 +86,10 @@ The `spring-boot-starter-parent` POM configures maven to filter both `applicatio
 and `application.yml` if they are stored in `src/main/resources`. We will have to
 adjust that to filter any profile based property files. Once filtering is set up,
 maven will automatically filter the file and place `dev` as the value. The 
-`spring.profiles.active` property can contain other profiles you want active. Simply
+`spring.profiles.active` property can contain other profiles you want active; simply
 separate them by a comma. Unfortunately, when spring-boot _deploys_, it will 
 not look at the filtered resources unless we configure the spring boot plugin properly.
-Setting the `addResources` configuration value to false in the POM will do the trick:
+Setting the `addResources` configuration value to *false* in the POM will do the trick:
 
 ```
 	<build>
@@ -105,8 +105,8 @@ Setting the `addResources` configuration value to false in the POM will do the t
 			<resource>
 				<directory>${basedir}/src/main/resources</directory>
 				<excludes>
-					<exclude>**/application.yml</exclude>
-					<exclude>**/application.properties</exclude>
+					<exclude>**/application*.yml</exclude>
+					<exclude>**/application*.properties</exclude>
 				</excludes>
 			</resource>
 		</resources>
@@ -196,7 +196,7 @@ it can be `@Autowired`
 Starting the application at this point will fail during compilation since the java
 compiler cannot find the H2 `org.h2.tools.Server` class. This is due to the fact
 that the H2 dependency is marked as `runtime` in the POM. Normally, this is appropriate
-since none of the H2 classes are not referred directly in the code, but rather 
+since none of the H2 classes are referred to directly in the code, but rather 
 the classes needed (like the H2 JDBC driver) are loaded dynamically by name.
 So to fix this, we will add a new property to the POM properties section, 
 `h2.scope` and set it to `compile`. This will include it in the packaged WAR. 

@@ -44,6 +44,13 @@
 				<item name="Hibernate Entities" href="1.html#a_hibernate_entities" />
 				<item name="REST API" href="1.html#a_rest_api" />
 				<item name="Sample Data" href="1.html#a_sample_data" />
+				<item name="Exposing IDs" href="1.html#a_exposing_ids" />
+			</item>
+			<item name="Security" href="2.html">
+				<item name="HTTP Basic Security" href="2.html#a_http_basic_security" />
+				<item name="Users and Passwords" href="2.html#a_users_and_passwords" />
+				<item name="REST Security" href="1.html#a_rest_security" />
+				<item name="CSRF Tokens" href="1.html#a_csrf_tokens" />
 			</item>
 			<item name="Appendices">
 				<item name="Appendix A: Lombok" href="appendix-lombok.html"></item>

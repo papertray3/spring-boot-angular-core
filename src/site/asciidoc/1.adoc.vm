@@ -34,6 +34,7 @@ public abstract class AbstractEntity implements Identifiable<Long> {
 	
 	public AbstractEntity() {
 		this.id = null;
+		this.version = 0l;
 	}
 	
 }
@@ -175,10 +176,10 @@ go to ${localHost} you'll notice some new output.
 {
   "_links" : {
     "contacts" : {
-      "href" : "${localHost}/contacts"
+      "href" : "${localHost}contacts"
     },
     "profile" : {
-      "href" : "${localHost}/alps"
+      "href" : "${localHost}alps"
     }
   }
 }
@@ -191,11 +192,11 @@ Plus you can find the custom functions we added at ${localHost}contacts/search.
 {
   "_links" : {
     "firstname" : {
-      "href" : "${localHost}/contacts/search/firstname{?name}",
+      "href" : "${localHost}contacts/search/firstname{?name}",
       "templated" : true
     },
     "lastname" : {
-      "href" : "${localHost}/contacts/search/lastname{?name}",
+      "href" : "${localHost}contacts/search/lastname{?name}",
       "templated" : true
     }
   }
@@ -243,4 +244,61 @@ in the `prod` profile of the POM:
 				</resources>
 			</build>
 		</profile>
+```
+
+Now when you access ${localHost}contacts you will get a list of contacts. You will
+notice that we get *all* of the contacts for *all* the users. We have yet to
+implement any security measures; also, since we used the `org.springframework.data.repository.CrudRepository`
+interface we get an exhaustive list.  Spring does have the `org.springframework.data.repository.PagingAndSortingRepository`
+interface that provides paging and sorting. 
+
+.Sample Output
+```
+fill in
+```
+
+Some other things to try:
+
+.Search by Name
+	${localHost}contacts/search/firstname?name=Dana
+	
+.Get a Specific Entity
+	${localHost}contacts/28
+	
+.Add a New Entity via Curl
+```
+curl -u user:password -X POST -H "Content-Type: application/json" \
+-d '{"firstName":"John","lastName":"Doe","numbers":[{"type":"home","number":"123-456-7890"}]}' \
+${localHost}contacts
+```
+
+.Update an Existing Entity via Curl
+```
+curl -u user:password -X PUT -H "Content-Type: application/json" \
+-d '{"firstName":"John","lastName":"Doe","numbers":[{"type":"home","number":"123-456-7890"}],"userId":"3"}' \
+${localHost}contacts/31
+```
+
+.Delete an Existing Entity via Curl
+	curl -u user:password -X DELETE ${localHost}contacts/31
+
+=== Exposing IDs
+
+You will notice in the JSON output the `id` field does not exist. Spring, by
+default, removes this field. It is implicit in the URI in the `_link` section of the JSON.
+Thinking ahead, it may be convenient to have the `id` field to quickly map the entities
+in JavaScript. There is a `exposeIdsFor` method in the `org.springframework.data.rest.core.config.RepositoryRestConfiguration`.
+So how do we call it?
+
+```
+@Configuration
+public class ContactsRepositoryRestMVCConfiguration extends SpringBootRepositoryRestMvcConfiguration {
+
+	@Override
+	protected void configureRepositoryRestConfiguration(RepositoryRestConfiguration config) {
+		super.configureRepositoryRestConfiguration(config);
+		config.exposeIdsFor(Contact.class, PhoneNumber.class);
+	}
+	
+}
 ```

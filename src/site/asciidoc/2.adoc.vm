@@ -1,0 +1,18 @@
+:icons: font
+:sectanchors:
+== Security
+
+Now we can start to address some security concerns. In this section we will be
+configuring the type of security we will be using (in this case HTTP Basic). Which
+types of requests need to be authenticated and which do not. Tying our authentication
+to the database, and setting up the encryption method (for this example bcrypt).
+There are a myriad of ways to configure the spring security, for this example
+I am pulling mostly from this https://spring.io/guides/tutorials/spring-security-and-angular-js/[Spring guide].
+
+=== HTTP Basic Security
+
+=== Users and Passwords
+
+=== REST Security
+
+=== CSRF Tokens
