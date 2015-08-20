@@ -292,13 +292,44 @@ So how do we call it?
 
 ```
 @Configuration
-public class ContactsRepositoryRestMVCConfiguration extends SpringBootRepositoryRestMvcConfiguration {
+public class ContactsRepositoryRestMVCConfiguration extends 
+SpringBootRepositoryRestMvcConfiguration {
 
 	@Override
-	protected void configureRepositoryRestConfiguration(RepositoryRestConfiguration config) {
+	protected void configureRepositoryRestConfiguration
+	(RepositoryRestConfiguration config) {
 		super.configureRepositoryRestConfiguration(config);
 		config.exposeIdsFor(Contact.class, PhoneNumber.class);
 	}
 	
 }
+```
+
+You will notice that the IDs are now included in the output:
+
+```
+"_links" : {
+    "search" : {
+      "href" : "${localHost}contacts/search"
+    }
+  },
+  "_embedded" : {
+    "contacts" : [ {
+      "id" : 1,
+      "version" : 0,
+      "firstName" : "Paula",
+      "lastName" : "Stone",
+      "numbers" : [ {
+        "id" : 1,
+        "version" : 0,
+        "type" : "home",
+        "number" : "474-617-0692"
+      }, {
+        "id" : 2,
+        "version" : 0,
+        "type" : "work",
+        "number" : "459-738-3740"
+   .
+   .
+   .
 ```

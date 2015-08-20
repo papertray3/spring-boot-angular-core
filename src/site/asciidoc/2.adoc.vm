@@ -11,8 +11,206 @@ I am pulling mostly from this https://spring.io/guides/tutorials/spring-security
 
 === HTTP Basic Security
 
+The security configuration will grow as we move a long. But the first goal is 
+to get actual user names and passwords working. If you are using the sample data
+given, you see three users `e1@sw.com`, `e2@sw.com`, and `e3@sw.com`.  Each user
+has the same bcrypt hash of `test` for a password. There are several hashing techniques
+you can use for passwords, and later we will see how to adjust the configuration
+to use a different scheme if you need. 
+
+For starters, we will continue to separate out configuration for various concerns
+into separate classes; but we also need to override the existing security implementation
+from `org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter`.
+So, we create the `com.bct.SecurityConfiguration` class:
+
+```[source,java]
+  @Slf4j
+  @Configuration
+  @Order(SecurityProperties.ACCESS_OVERRIDE_ORDER)
+  protected static class SecurityConfiguration extends WebSecurityConfigurerAdapter {
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+		log.info("Configuring basic security");
+
+      http
+        .httpBasic()
+      .and()
+        .authorizeRequests()
+          .antMatchers("/").permitAll()
+          .anyRequest().authenticated();
+    }
+  }
+  
+```
+
+This simply tells Spring to allow unauthenticated requests to the root of the application, 
+but everything else needs to be authenticated. However, at this point Spring does 
+not know how to get users and passwords yet. But we will be adding more 
+to this configuration as we go; right now this is fairly close to the default setup. 
+Next we need to configure Spring to authenticate users against the data in the database.
+
 === Users and Passwords
 
+Spring gives you several ways to pull user information for authentication and
+authorization purposes; from LDAP, flat files, databases, certificates, etc. For
+this application I wanted to keep everything straightforward and self contained 
+(at least as much as possible). So, I'm choosing to store user info in the database.
+While this isn't the only way to do this, I found the easiest way is to simply
+create a user repository but we'll leave off the `@RestRepositoryResource` so not 
+to expose it as a rest service. And we'll add a method to find a user by their
+email address.
+
+```[source,java]
+public interface UserRepository extends CrudRepository<User, Long> {
+
+	User findByEmail(@Param("email") String email);
+}
+```
+
+Under the hood, Spring is using a `org.springframework.security.core.userdetails.UserDetailsService`
+to find a user by their user name (in this case an email address) with the
+`loadUserByUsername` method. We will override this method to find the 
+user from the database via the `UserRepository` class. Further, Spring expects
+that we pass a `org.springframework.security.core.userdetails.User` object around;
+so we will create a helper class to easily provide the information Spring expects.
+
+.ContactsUserDetails Class to Hold User Information
+```[source,java]
+@Getter
+public class ContactsUserDetails extends User {
+	
+	private final long id;
+	
+	public ContactsUserDetails(com.bct.data.User user) {
+		super(user.getEmail(), user.getPassword(), user.isEnabled(), true, true, true, getAuthorities(user));
+		this.id = user.getId();
+	}
+	
+	private static Collection<? extends GrantedAuthority> getAuthorities(com.bct.data.User user) {
+        List<GrantedAuthority> authorities = new ArrayList<GrantedAuthority>(user.getRoles().size());
+
+        for (UserRole role : user.getRoles()) {
+            authorities.add(new SimpleGrantedAuthority(role.getRole()));
+        }
+
+        return authorities;
+	}
+
+}
+```
+
+.ContactsUserDetailsService Class for Retrieving Users
+```[source,java]
+@Service
+public class ContactsUserDetailService implements UserDetailsService {
+	
+	@Autowired
+	private UserRepository repo;
+
+	@Override
+	public UserDetails loadUserByUsername(String username)
+			throws UsernameNotFoundException {
+		com.bct.data.User user = repo.findByEmail(username);
+
+		//String password = user.getPassword();
+		//return new org.springframework.security.core.userdetails.User(username, password, user.isEnabled(), true, true, true, auth);
+		return new ContactsUserDetails(user);
+	}
+
+}
+```
+
+NOTE: The `@Service` annotation will instruct Spring to instantiate an object of this
+type. Then we can `@Autowire` it into other classes without instantiating it 
+ourselves.
+
+Next we need to tell spring to use the `ContactsUserDetailsService` to get user
+information. Also, we need to configure Spring to use bcrypt for the hashing
+implementation (for now I've added a `@Bean` to the main `SecurityConfiguration`
+class with the thought you could provide a means to change the encryption type
+from the application.properties file).
+
+```[source,java]
+  @Slf4j
+  @Configuration
+  @Order(SecurityProperties.ACCESS_OVERRIDE_ORDER)
+  protected static class SecurityConfiguration extends WebSecurityConfigurerAdapter {
+
+	@Bean
+	public PasswordEncoder passwordEncoder() {
+		return new BCryptPasswordEncoder();
+	}
+	.
+	.
+	.
+```
+
+Now we just have to plumb things together by overriding the `init` method of the
+`org.springframework.security.config.annotation.authentication.configurers.GlobalAuthenticationConfigurerAdapter` 
+class
+
+```[source,java]
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@Configuration
+public class AuthenticationSecurity extends GlobalAuthenticationConfigurerAdapter {
+
+	@Autowired
+	private ContactsUserDetailService users;
+
+	
+	@Autowired private PasswordEncoder passwordEncoder;
+
+
+	@Override
+	public void init(AuthenticationManagerBuilder auth) throws Exception {
+		auth.userDetailsService(users).passwordEncoder(passwordEncoder);
+	}
+
+}
+```
+
+At this point you can hit ${localHost}/contacts and use `e1@sw.com:test` as the
+credentials. However, you will still get a full list of contacts for all the users,
+not just `e1@sw.com`. Time to fix that...
+
 === REST Security
+
+Whenever a user wants to perform any CRUD operation we need to make sure that they
+can only do that against entities they actually own (based on the user ID). But
+how do we accomplish this since there is no code we actually wrote? We can use
+Spring annotations on the methods of our repository interface to declare the type
+of authorization that should take place. This does however, force us to "override"
+the interface methods...which is strange since it's an interface. Before we do that
+though we need to enable the security filters by placing the `@EnableGlobalMethodSecurity`
+annotation on the `SecurityConfiguration` class:
+
+```[source,java]
+  @Slf4j
+  @Configuration
+  @Order(SecurityProperties.ACCESS_OVERRIDE_ORDER)
+  @EnableGlobalMethodSecurity(prePostEnabled = true)
+  protected static class SecurityConfiguration extends WebSecurityConfigurerAdapter {
+  .
+  .
+  .
+```
+
+This will allow us to use various annotations, such as `@PreAuthorize` or `@PostFilter`,
+on the methods with http://docs.spring.io/spring/docs/current/spring-framework-reference/html/expressions.html[Spring Expression Language (or SpEL)] that 
+references the authenticated `principal` object. However, before we can use the
+`principal` object in our SpEL expressions we need to inject the authentication object
+into the SpEL processor. Now, depending on the version of Spring Security
+you happen to be using, this can be as easy as creating a `@Bean` in the `SecurityConfiguration`
+class.
+
+.SecurityEvaluationContextExtension Class Available in Spring Security version 4.0.0.RELEASE
+```[source,java]
+
+	@Bean
+	public SecurityEvaluationContextExtension securityEvaluationContextExtension() {
+		return new SecurityEvaluationContextExtension();
+	}
+	
+```
 
 === CSRF Tokens

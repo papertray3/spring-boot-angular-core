@@ -72,8 +72,7 @@ file.
 
 Pointing your browser to http://localhost:8081 will then prompt you for a user
 name and password. The default user name is `user`. The output of the above maven 
-command will generate a lot of
-output. You should see a default password given by spring in the output:
+command will generate a lot log messages. You should see a default password given by spring in the output:
 
 	Using default security password: 9e8c4a37-8ce6-4ebb-a701-227a84135072
 	

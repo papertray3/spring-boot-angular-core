@@ -49,7 +49,7 @@ can simply extend the concept.
 
 You will notice in the `src/main/resources` directory there is the `application.properties` file. 
 This file will allow you to configure various different aspects of spring, from 
-JDBC connection information to HTTP compression. Spring provides several different
+JDBC connection information to HTTP compression (as well as adding your own, custom properties). Spring provides several different
 ways to configure things, using this file is one of the simplest. Spring also allows
 you to separate properties based on spring profiles; for instance, if you need a 
 different set of JDBC credentials for the production build versus the development
@@ -72,7 +72,7 @@ Editor available which will provide auto-complete for the common spring properti
 when editing the `application.properties` file.
 When you create the `application-dev.properties` file, STS will use the default 
 properties editor instead of the Spring Properties Editor (no auto-complete...boo). If you right mouse click
-the properties file you can click on the `Enable Spring Properties Editor` and viola!
+the properties file you can click on the `Enable Spring Properties Editor` and voila!
 
 At this point, spring will still ignore this file until we enable the profile. While
 there are several ways to do this, the easiest is to set the `spring.profiles.active`
@@ -192,6 +192,7 @@ the application's configuration
 * `@Profile`: Ensures that the class is only used if the given profile is active
 * `@Bean`: Tells spring this is a resource it needs to instantiate and manage; 
 it can be `@Autowired`
+* `@Value`: Tells spring to set the webPort variable to the application property `h2.webPort`.
 
 Starting the application at this point will fail during compilation since the java
 compiler cannot find the H2 `org.h2.tools.Server` class. This is due to the fact
